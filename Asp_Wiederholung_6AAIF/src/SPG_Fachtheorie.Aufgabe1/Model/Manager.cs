@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using System;
+using System.ComponentModel.DataAnnotations;
 
 namespace SPG_Fachtheorie.Aufgabe1.Model
 {
@@ -15,5 +16,6 @@ namespace SPG_Fachtheorie.Aufgabe1.Model
 
         [MaxLength(255)]
         public string CarType { get; set; }
+        public DateTime LastUpdate { get; set; }
     }
 }
