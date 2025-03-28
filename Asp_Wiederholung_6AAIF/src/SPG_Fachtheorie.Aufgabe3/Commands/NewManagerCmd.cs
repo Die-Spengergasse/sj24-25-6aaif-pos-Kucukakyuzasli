@@ -16,14 +16,14 @@ namespace SPG_Fachtheorie.Aufgabe3.Commands
     }
     */
     public record NewManagerCmd(
-        [Range(1, 999999, ErrorMessage = "Invalid registration numbner")]
+        [Range(1, 999999, ErrorMessage = "Invalid registration number")]
         int RegistrationNumber,
         [StringLength(255, MinimumLength = 1, ErrorMessage = "Invalid firstname")]
         string FirstName,
-        [StringLength(255, MinimumLength = 1, ErrorMessage = "Invalid firstname")]
+        [StringLength(255, MinimumLength = 1, ErrorMessage = "Invalid lastname")]
         string LastName,
         AddressCmd? Address,
-        [StringLength(255, MinimumLength = 1, ErrorMessage = "Invalid car type")]
+        [StringLength(255, MinimumLength = 1, ErrorMessage = "Invalid car")]
         string CarType
         ) : IValidatableObject
     {
@@ -35,12 +35,4 @@ namespace SPG_Fachtheorie.Aufgabe3.Commands
                     new string[] {nameof(FirstName), nameof(LastName)});
         }
     }
-
-    public record AddressCmd(
-        [StringLength(255, MinimumLength = 1, ErrorMessage = "Invalid firstname")]
-        string Street,
-        [RegularExpression(@"^[0-9]{4,5}$", ErrorMessage = "Invalid zip")]
-        string Zip,
-        [StringLength(255, MinimumLength = 1, ErrorMessage = "Invalid firstname")]
-        string City);
 }
