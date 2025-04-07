@@ -1,22 +1,23 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using SPG_Fachtheorie.Aufgabe1.Commands;
 using SPG_Fachtheorie.Aufgabe1.Infrastructure;
 using SPG_Fachtheorie.Aufgabe1.Model;
-using SPG_Fachtheorie.Aufgabe3.Commands;
 using SPG_Fachtheorie.Aufgabe3.Dtos;
+using SPG_Fachtheorie.Aufgabe1.Services;
 
 namespace SPG_Fachtheorie.Aufgabe3.Controllers
 {
-    [Route("api/[controller]")] 
+    [Route("api/[controller]")]  // --> /api/payments
     [ApiController]
     public class PaymentsController : ControllerBase
     {
-        private readonly AppointmentContext _db;
+        private readonly PaymentService _service;
 
-        public PaymentsController(AppointmentContext db)
+        public PaymentsController(PaymentService service)
         {
-            _db = db;
+            _service = service;
         }
 
         /// <summary>
@@ -28,7 +29,8 @@ namespace SPG_Fachtheorie.Aufgabe3.Controllers
         public ActionResult<List<PaymentDto>> GetAllPayments(
             [FromQuery] int? cashDesk, [FromQuery] DateTime? dateFrom)
         {
-            var payments = _db.Payments
+            
+            return Ok(_service.Payments
                 .Where(p =>
                     cashDesk.HasValue
                         ? p.CashDesk.Number == cashDesk.Value : true)
@@ -40,8 +42,7 @@ namespace SPG_Fachtheorie.Aufgabe3.Controllers
                     p.PaymentDateTime,
                     p.CashDesk.Number, p.PaymentType.ToString(),
                     p.PaymentItems.Sum(p => p.Amount)))
-                .ToList();
-            return Ok(payments);
+                .ToList());
         }
 
         [HttpGet("{id}")]
@@ -49,7 +50,7 @@ namespace SPG_Fachtheorie.Aufgabe3.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public ActionResult<PaymentDetailDto> GetPaymentDetail(int id)
         {
-            var payment = _db.Payments
+            var payment = _service.Payments
                 .Where(p => p.Id == id)
                 .Select(p => new PaymentDetailDto(
                     p.Id, p.Employee.FirstName, p.Employee.LastName,
@@ -65,137 +66,68 @@ namespace SPG_Fachtheorie.Aufgabe3.Controllers
             return Ok(payment);
         }
 
-        
+        /// <summary>
+        /// POST /api/payments
+        /// </summary>
         [HttpPost]
         [ProducesResponseType(StatusCodes.Status201Created)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public IActionResult AddPayment(NewPaymentCommand cmd)
         {
-            var cashDesk = _db.CashDesks.FirstOrDefault(c => c.Number == cmd.CashDeskNumber);
-            if (cashDesk is null) return Problem("Invalid cash desk", statusCode: 400);
-            var employee = _db.Employees.FirstOrDefault(e => e.RegistrationNumber == cmd.EmployeeRegistrationNumber);
-            if (employee is null) return Problem("Invalid employee", statusCode: 400);
-
-            if (!Enum.TryParse<PaymentType>(cmd.PaymentType, out var paymentType))
-                return Problem("Invalid payment type", statusCode: 400);
-
-            var payment = new Payment(
-                cashDesk, cmd.PaymentDateTime, employee, paymentType);
-            _db.Payments.Add(payment);
-            try
-            {
-                _db.SaveChanges();
-            }
-            catch (DbUpdateException e)
-            {
-                return Problem(e.InnerException?.Message ?? e.Message);
-            }
-            return CreatedAtAction(nameof(AddPayment), new { Id = payment.Id });
+            return CallServiceMethod(() => {
+                var payment = _service.CreatePayment(cmd);
+                return CreatedAtAction(nameof(AddPayment), new { Id = payment.Id });
+            });
+            
         }
 
-        
+        /// <summary>
+        /// DELETE /api/payments/{id}?deleteItems=true|false
+        /// </summary>
+        /// <param name="id"></param>
+        /// <returns></returns>
         [HttpDelete("{id}")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public IActionResult DeletePayment(int id, [FromQuery] bool deleteItems)
+        public IActionResult DeletePayment(int id)
         {
-            var payment = _db.Payments.FirstOrDefault(p => p.Id == id);
-            if (payment is null) return NoContent();
-            var paymentItems = _db.PaymentItems.Where(p => p.Payment.Id == id).ToList();
-            if (paymentItems.Any() && deleteItems)
-            {
-                try
-                {
-                    _db.PaymentItems.RemoveRange(paymentItems);
-                    _db.SaveChanges();
-                }
-                catch (DbUpdateException e)
-                {
-                    return Problem(e.InnerException?.Message ?? e.Message, statusCode: 400);
-                }
-                catch (InvalidOperationException e)
-                {
-                    return Problem(
-                        e.InnerException?.Message ?? e.Message,
-                        statusCode: StatusCodes.Status400BadRequest);
-                }
-            }
-            try
-            {
-                _db.Payments.Remove(payment);
-                _db.SaveChanges();
-            }
-            catch (DbUpdateException e)
-            {
-                return Problem(e.InnerException?.Message ?? e.Message, statusCode: 400);
-            }
-            catch (InvalidOperationException e)
-            {
-                return Problem(
-                    e.InnerException?.Message ?? e.Message,
-                    statusCode: StatusCodes.Status400BadRequest);
-            }
-            return NoContent();
+            return CallServiceMethod(() => {
+                
+                _service.DeletePayment(id);
+                return NoContent();
+            });
+            
         }
-
-
-
 
         [HttpPut("/api/paymentItems/{id}")]
-        [ProducesResponseType(StatusCodes.Status204NoContent)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public IActionResult UpdatePayment(int id, [FromBody] UpdatePaymentCmd cmd)
+        public IActionResult UpdatePaymentItem(int id, UpdatePaymentItemCommand cmd)
         {
-            if (id != cmd.Id)
-                return Problem("Payment Item not found", statusCode: 400);
-            var paymentItem = _db.PaymentItems.FirstOrDefault(m => m.Id == id);
-            if (paymentItem is null)
-                return Problem("Payment Item not found", statusCode: 404);
-            /*if (paymentItem.LastUpdate != cmd.LastUpdate)
-                return Problem("Payment item has changed", statusCode: 400);*/
-            /*if(paymentItem.Payment.Id != cmd.PaymentId)
-                return Problem("Invalid payment item ID", statusCode: 400);*/
-
-            paymentItem.ArticleName = cmd.ArticleName;
-            paymentItem.Amount = cmd.Amount;
-            paymentItem.Price = cmd.Price;
-            //paymentItem.Payment.Id = cmd.PaymentId;
-            paymentItem.LastUpdate = DateTime.UtcNow;
-            try
-            {
-                _db.SaveChanges();
-            }
-            catch (DbUpdateException e)
-            {
-                return Problem(e.InnerException?.Message ?? e.Message, statusCode: 400);
-            }
-            return NoContent();
+            return CallServiceMethod(() => {
+                _service.UpdatePaymentItem(id, cmd);
+                return NoContent();
+            });
+            
         }
 
-
-
-        [HttpPatch("/api/payments/{id}")]
-        [ProducesResponseType(StatusCodes.Status204NoContent)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public IActionResult UpdateConfirmed(int id, [FromBody] UpdateConfirmedCmd cmd)
+        [HttpPatch("{id}")]
+        public IActionResult UpdateConfirmed(int id)
         {
-            var payment = _db.Payments.FirstOrDefault(m => m.Id == id);
-            if (payment is null)
-                return Problem("Payment not found", statusCode: 404);
-            if (payment.Confirmed != null)
-                return Problem("Payment already confirmed", statusCode: 400);
-            payment.Confirmed = cmd.Confirmed;
-            try
-            {
-                _db.SaveChanges();
+            return CallServiceMethod(() => {
+                _service.ConfirmPayment(id);
+                return NoContent();
+            });
+        }
+
+        
+
+        private IActionResult CallServiceMethod(Func<IActionResult> serviceCall) {
+            try {
+                return serviceCall();
+            } catch (PaymentServiceException e) when (e.NotFoundException) {
+                return Problem(e.Message, statusCode: 404);
+            } catch (PaymentServiceException e) {
+                return Problem(e.Message, statusCode: 400);
             }
-            catch (DbUpdateException e)
-            {
-                return Problem(e.InnerException?.Message ?? e.Message, statusCode: 400);
-            }
-            return NoContent();
         }
     }
 }
