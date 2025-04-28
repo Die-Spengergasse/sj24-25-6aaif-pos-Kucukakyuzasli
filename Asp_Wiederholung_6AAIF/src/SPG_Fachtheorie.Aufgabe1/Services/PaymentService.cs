@@ -57,6 +57,7 @@ namespace SPG_Fachtheorie.Aufgabe1.Services
         public void DeletePayment(int paymentId) {
             var payment = _db.Payments.FirstOrDefault(p => p.Id == paymentId);
             if (payment is null)
+                //TODO: in controller this should return nocontent()
                 throw new PaymentServiceException("Payment not found") { NotFoundException = true };
             var paymentItems = _db.PaymentItems.Where(p => p.Payment.Id == paymentId).ToList();
             if (paymentItems.Any()) {
