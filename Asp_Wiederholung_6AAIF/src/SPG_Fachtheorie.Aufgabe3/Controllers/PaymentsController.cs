@@ -24,6 +24,7 @@ namespace SPG_Fachtheorie.Aufgabe3.Controllers
         /// GET /api/payments
         /// </summary>
         /// <returns></returns>
+        /// api/
         [HttpGet]
         [ProducesResponseType(StatusCodes.Status200OK)]
         public ActionResult<List<PaymentDto>> GetAllPayments(
@@ -44,7 +45,7 @@ namespace SPG_Fachtheorie.Aufgabe3.Controllers
                     p.PaymentItems.Sum(p => p.Amount)))
                 .ToList());
         }
-
+        //api/payments/1
         [HttpGet("{id}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -104,7 +105,7 @@ namespace SPG_Fachtheorie.Aufgabe3.Controllers
         {
             return CallServiceMethod(() => {
                 _service.UpdatePaymentItem(id, cmd);
-                return NoContent();
+                return Ok();
             });
             
         }
@@ -114,7 +115,7 @@ namespace SPG_Fachtheorie.Aufgabe3.Controllers
         {
             return CallServiceMethod(() => {
                 _service.ConfirmPayment(id);
-                return NoContent();
+                return Ok();
             });
         }
 
